@@ -59,6 +59,10 @@
             android:name=".alarmService"
             android:enabled="true"
             android:exported="true"></service>
+
+        <meta-data
+            android:name="com.naver.maps.map.1e84fxxo6m"
+            android:value="1e84fxxo6m" />
     </application>
 
 </manifest>
