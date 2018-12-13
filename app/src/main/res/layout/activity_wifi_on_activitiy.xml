@@ -63,6 +63,32 @@
             android:textColor="#000000"
             android:textStyle="bold" />
 
+        <Switch
+            android:id="@+id/wifiSwitch"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="left"
+            android:layout_marginLeft="30dp"
+            android:layout_marginBottom="0dp"
+            android:layout_marginTop="30dp"
+            android:text="Wifi  "
+            android:textSize="20dp"
+            android:textColor="#000000"
+            android:textStyle="bold" />
+
+        <Switch
+            android:id="@+id/brightnessSwitch"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="left"
+            android:layout_marginLeft="30dp"
+            android:layout_marginBottom="0dp"
+            android:layout_marginTop="10dp"
+            android:text="Brightness  "
+            android:textSize="20dp"
+            android:textColor="#000000"
+            android:textStyle="bold" />
+
         <Button
             android:id="@+id/registerHereButton"
             android:layout_width="wrap_content"
@@ -71,6 +97,17 @@
             android:layout_marginTop="20dp"
             android:padding = "20dp"
             android:text="현재 위치 등록"
+            android:textSize="20dp"
+            android:textColor="#000000"
+            android:textStyle="bold" />
+        <Button
+            android:id="@+id/cancelWifiBrightnessButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginTop="20dp"
+            android:padding = "20dp"
+            android:text="매크로 취소"
             android:textSize="20dp"
             android:textColor="#000000"
             android:textStyle="bold" />
