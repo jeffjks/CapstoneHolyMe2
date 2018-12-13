@@ -12,6 +12,10 @@ import android.media.SoundPool;
 import android.view.View;
 import android.widget.Button;
 
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+
 public class appPushlistenerActivity extends AppCompatActivity {
 
     @Override
@@ -19,6 +23,11 @@ public class appPushlistenerActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_app_pushlistener);
         boolean isPermissionAllowed = isNotiPermissionAllowed();
+
+        FirebaseAuth mAuth = FirebaseAuth.getInstance();
+        FirebaseDatabase database = FirebaseDatabase.getInstance();
+        final DatabaseReference myRef = database.getReference("USER");
+        myRef.child(mAuth.getCurrentUser().getUid() + "/MACRO/" + "appPush").setValue(1);
 
         if(!isPermissionAllowed) {
             Intent intent = new Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS");

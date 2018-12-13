@@ -12,6 +12,13 @@ import android.service.notification.StatusBarNotification;
 import android.util.Log;
 import android.widget.Toast;
 
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+
+import java.util.HashMap;
+import java.util.Map;
+
 public class appPushlistenerService extends NotificationListenerService {
 
     @Override
@@ -51,6 +58,21 @@ public class appPushlistenerService extends NotificationListenerService {
         Log.i("NotificationListener", "[snowdeer] Sub Text:" + subText);
 
         Toast.makeText(getApplicationContext(), text, Toast.LENGTH_SHORT).show();
+
+        FirebaseAuth mAuth = FirebaseAuth.getInstance();
+        FirebaseDatabase database = FirebaseDatabase.getInstance();
+        final DatabaseReference myRef = database.getReference("USER");
+        //myRef.child(mAuth.getCurrentUser().getUid() + "/appPushMessage/" + "title").setValue(1);
+
+        Map<String, Object> update = new HashMap<>();
+
+        String key = myRef.child(mAuth.getCurrentUser().getUid() + "/appPushMessage").push().getKey();
+
+        update.put("/appPushMessage/" + key + "/title", title);
+        update.put("/appPushMessage/" + key + "/text", text);
+        update.put("/appPushMessage/" + key + "/subText", subText);
+
+        //myRef.updateChildren(update);
     }
 
     @Override

@@ -23,10 +23,17 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.Spinner;
+import android.widget.Switch;
 import android.widget.TextView;
+import android.widget.Toast;
+
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
 
 import org.w3c.dom.Text;
 
@@ -35,68 +42,122 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 
+import static android.net.wifi.WifiManager.WIFI_STATE_ENABLED;
+
 public class wifiOnActivity extends AppCompatActivity {
     private ArrayList<String> nativeFunctionList = new ArrayList<>();
 
-    private GpsInfo gps;
+    //private GpsInfo gps;
     private final int PERMISSIONS_ACCESS_FINE_LOCATION = 1000;
     private final int PERMISSIONS_ACCESS_COARSE_LOCATION = 1001;
+    private final int DEFAULT_REMAINING_TIME = 60000;
+    private final double MINIMUM_DISTANCE = 0.00005; // 0.55km
+    private final int REMAINING_TIME_RATE = 1000000;
     private boolean isAccessFineLocation = false;
     private boolean isAccessCoarseLocation = false;
     private boolean isPermission = false;
 
-    private TextView wifiSSIDText, latitudeText, longitudeText;
+    private TextView wifiSSIDText, latitudeText, longitudeText, remaingingTimeText;
+    private Switch wifiSwitch, brightnessSwitch;
     private WifiInfo wifiInfo = null;
 
-    private String mCurrentTime;
-    private String mPreviousTime;
-    private String ssid = null;
+    private String ssid = "\"G6_4917\""; // iptime65 // \"G6_4917\"
     private String bssid = null;
+
+    private GpsInfo gps;
+
+    private double latitude = 0, longitude = 0;
+    private double des_latitude, des_longitude;
+    private int remainingTime = DEFAULT_REMAINING_TIME;
+
+    private WindowManager.LayoutParams save;
+    private WindowManager.LayoutParams params;
+    private float brightness;
+
+    WifiManager wifiManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_wifi_on_activitiy);
-
-        latitudeText = (TextView) findViewById(R.id.latitudeText);
-        longitudeText = (TextView) findViewById(R.id.longitudeText);
-        final Button gpsButton = (Button) findViewById(R.id.showGpsButton);
-        final TextView wifiSSIDText = (TextView) findViewById(R.id.wifiSSID);
-        WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-
         gps = new GpsInfo(wifiOnActivity.this);
 
-        timeThread thread = new timeThread(gps);
+        params = getWindow().getAttributes();
+        save = getWindow().getAttributes();
+        brightness = save.screenBrightness;
+
+        latitudeText = findViewById(R.id.latitudeText);
+        longitudeText = findViewById(R.id.longitudeText);
+        remaingingTimeText = findViewById(R.id.remainingTimeText);
+        wifiSwitch = findViewById(R.id.wifiSwitch);
+        brightnessSwitch = findViewById(R.id.brightnessSwitch);
+        wifiSSIDText = findViewById(R.id.wifiSSID);
+        final Button registerButton = findViewById(R.id.registerHereButton);
+        final Button cancelWifiBrightnessButton = findViewById(R.id.cancelWifiBrightnessButton);
+
+        des_latitude = 37.0;
+        des_longitude = -122.0;
+
+        GpsInfo gps = new GpsInfo(wifiOnActivity.this);
+        wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+
+        final timeThread thread = new timeThread(gps);
         thread.start();
+        wifiThread wThread = new wifiThread();
+        wThread.start();
 
-        if (wifiManager != null)
-            wifiInfo = wifiManager.getConnectionInfo();
-        if (wifiInfo != null) {
-            ssid = wifiInfo.getSSID();
-            bssid = wifiInfo.getBSSID();
-        }
-        wifiSSIDText.setText(ssid);
-
-        gpsButton.setOnClickListener(new View.OnClickListener() {
+        registerButton.setOnClickListener(new View.OnClickListener() {
             public void onClick(View arg0) {
-                Log.i("tag", "permission click!");
+                GpsInfo gps;
+                gps = new GpsInfo(wifiOnActivity.this);
+
+                wifiSSIDText.setText(wifiInfo.getSSID());
+
                 if (!isPermission) {
                     callPermission();
                     return;
                 }
 
-                gps = new GpsInfo(wifiOnActivity.this);
                 if (gps.isGetLocation()) { // GPS 사용유무 체크
-                    double latitude = gps.getLatitude();
-                    double longitude = gps.getLongitude();
+                    des_latitude = gps.getLatitude(); //37.4; //gps.getLatitude(); (37.5)
+                    des_longitude = gps.getLongitude(); // -122.0; //gps.getLongitude(); (126.9)
+                    Log.d("MSG", "set destination here");
+                    latitude = gps.getLatitude();
+                    longitude = gps.getLongitude();
+                    latitudeText.setText("위도: "+String.valueOf(latitude));
+                    longitudeText.setText("경도: "+String.valueOf(longitude));
+                    Toast.makeText(wifiOnActivity.this, "현재 위치가 목적지로 등록되었습니다.", Toast.LENGTH_SHORT).show();
 
-                    latitudeText.setText(String.valueOf(latitude));
-                    longitudeText.setText(String.valueOf(longitude));
-                    wifiSSIDText.setText(ssid);
+                    FirebaseAuth mAuth = FirebaseAuth.getInstance();
+                    FirebaseDatabase database = FirebaseDatabase.getInstance();
+                    final DatabaseReference myRef = database.getReference("USER");
+
+                    myRef.child(mAuth.getCurrentUser().getUid() + "/GPS/latitude").setValue(latitude);
+                    myRef.child(mAuth.getCurrentUser().getUid() + "/GPS/longitude").setValue(longitude);
+                    if (wifiSwitch.isChecked())
+                        myRef.child(mAuth.getCurrentUser().getUid() + "/MACRO/" + "wifi").setValue(1);
+                    else
+                        myRef.child(mAuth.getCurrentUser().getUid() + "/MACRO/" + "wifi").setValue(0);
+                    if (brightnessSwitch.isChecked())
+                        myRef.child(mAuth.getCurrentUser().getUid() + "/MACRO/" + "brightness").setValue(1);
+                    else
+                        myRef.child(mAuth.getCurrentUser().getUid() + "/MACRO/" + "brightness").setValue(0);
                 }
                 else {
                     gps.showSettingsAlert();
                 }
+            }
+        });
+
+        cancelWifiBrightnessButton.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View arg0) {
+                thread.interrupt();
+                Toast.makeText(getApplicationContext(), "와이파이/밝기 매크로가 취소되었습니다.", Toast.LENGTH_SHORT).show();
+                FirebaseAuth mAuth = FirebaseAuth.getInstance();
+                FirebaseDatabase database = FirebaseDatabase.getInstance();
+                final DatabaseReference myRef = database.getReference("USER");
+                myRef.child(mAuth.getCurrentUser().getUid() + "/MACRO/" + "wifi").setValue(0);
+                myRef.child(mAuth.getCurrentUser().getUid() + "/MACRO/" + "brightness").setValue(0);
             }
         });
 
@@ -106,11 +167,15 @@ public class wifiOnActivity extends AppCompatActivity {
     Handler handler = new Handler() {
         @Override
         public void handleMessage(Message msg) {
-
+            latitudeText.setText("위도: "+String.valueOf(latitude));
+            longitudeText.setText("경도: "+String.valueOf(longitude));
+            remaingingTimeText.setText("다음 시간: "+String.valueOf(remainingTime));
+            //wifiSSIDText.setText(ssid);
         }
     };
 
     public class timeThread extends Thread {
+
         GpsInfo gps;
 
         timeThread(GpsInfo gps) {
@@ -119,18 +184,106 @@ public class wifiOnActivity extends AppCompatActivity {
         @Override
         public void run() {
             while(true){
-                Message msg = new Message();
-                handler.sendMessage(msg);
-                Log.d("MESSAGE", "msg");
+                if (!currentThread().isInterrupted()) {
+                    Message msg = new Message();
+                    handler.sendMessage(msg);
+                    Log.d("timeThread", "msg: " + remainingTime);
+
+                    remainingTime = getGPSInfo();
+                }
 
                 try {
-                    Thread.sleep(2000);
+                    Thread.sleep(remainingTime);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
             }
         }
     }
+
+    public class wifiThread extends Thread {
+        @Override
+        public void run() {
+            while(true){
+                Message msg = new Message();
+                handler.sendMessage(msg);
+                Log.d("wifiThread", "msg");
+
+                wifiInfo = wifiManager.getConnectionInfo();
+                if (wifiManager.getWifiState() == WIFI_STATE_ENABLED) {
+                    if (!wifiInfo.getSSID().equals(ssid)) {
+                        wifiManager.setWifiEnabled(false);
+                        Log.d("wifiThread", "turnOff wifi");
+                        Log.d("wifiThread", wifiInfo.getSSID());
+                    }
+                }
+
+                try {
+                    Thread.sleep(10000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+
+    private int getGPSInfo() {
+        if (!isPermission) {
+            callPermission();
+            return DEFAULT_REMAINING_TIME;
+        }
+
+        if (gps.isGetLocation()) { // GPS 사용유무 체크
+            double distance;
+            latitude = gps.getLatitude();
+            longitude = gps.getLongitude();
+
+            distance = Math.sqrt(Math.pow((des_latitude - latitude), 2) + Math.pow((des_longitude - longitude), 2));
+            remainingTime = (int) (distance*REMAINING_TIME_RATE/2);
+
+
+            if (distance < MINIMUM_DISTANCE) {
+                if (wifiManager != null)
+                    wifiInfo = wifiManager.getConnectionInfo();
+                if (wifiInfo != null) {
+                    bssid = wifiInfo.getBSSID();
+                }
+                if (brightnessSwitch.isChecked()) {
+                    params.screenBrightness = brightness;
+                    getWindow().setAttributes(params);
+                    Log.d("brightness1", params.screenBrightness + "");
+                }
+
+                if (wifiSwitch.isChecked()) {
+                    wifiManager.setWifiEnabled(true);
+                    Message message = handler.obtainMessage();
+                    handler.sendMessage(message);
+                    Log.d("distance1", "" + distance);
+                }
+                return DEFAULT_REMAINING_TIME;
+            }
+            else {
+                if (brightnessSwitch.isChecked()) {
+                    params.screenBrightness = 0.1f;
+                    getWindow().setAttributes(params);
+                    Log.d("brightness2",  brightness+"");
+                }
+                if (wifiSwitch.isChecked()) {
+                    Message message = handler.obtainMessage();
+                    handler.sendMessage(message);
+                    wifiManager.setWifiEnabled(false);
+                    Log.d("distance2", "" + distance);
+                    Log.d("remainingTime", "" + remainingTime);
+                }
+                return remainingTime;
+            }
+        }
+        else {
+            return DEFAULT_REMAINING_TIME;
+        }
+    }
+
 
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
@@ -198,7 +351,7 @@ class GpsInfo extends Service implements LocationListener {
 
     @TargetApi(23)
     public Location getLocation() {
-        if ( Build.VERSION.SDK_INT >= 23 &&
+        if (Build.VERSION.SDK_INT >= 23 &&
                 ContextCompat.checkSelfPermission(
                         mContext, android.Manifest.permission.ACCESS_FINE_LOCATION )
                         != PackageManager.PERMISSION_GRANTED &&
@@ -213,17 +366,12 @@ class GpsInfo extends Service implements LocationListener {
             locationManager = (LocationManager) mContext
                     .getSystemService(LOCATION_SERVICE);
 
-            // GPS 정보 가져오기
             isGPSEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
-
-            // 현재 네트워크 상태 값 알아오기
             isNetworkEnabled = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
 
             if (!isGPSEnabled && !isNetworkEnabled) {
-                // GPS 와 네트워크사용이 가능하지 않을때 소스 구현
             } else {
                 this.isGetLocation = true;
-                // 네트워크 정보로 부터 위치값 가져오기
                 if (isNetworkEnabled) {
                     locationManager.requestLocationUpdates(
                             LocationManager.NETWORK_PROVIDER,
@@ -265,18 +413,12 @@ class GpsInfo extends Service implements LocationListener {
         return location;
     }
 
-    /**
-     * GPS 종료
-     * */
     public void stopUsingGPS(){
         if(locationManager != null){
             locationManager.removeUpdates(GpsInfo.this);
         }
     }
 
-    /**
-     * 위도값을 가져옵니다.
-     * */
     public double getLatitude(){
         if(location != null){
             lat = location.getLatitude();
@@ -284,9 +426,6 @@ class GpsInfo extends Service implements LocationListener {
         return lat;
     }
 
-    /**
-     * 경도값을 가져옵니다.
-     * */
     public double getLongitude(){
         if(location != null){
             lon = location.getLongitude();
@@ -294,24 +433,16 @@ class GpsInfo extends Service implements LocationListener {
         return lon;
     }
 
-    /**
-     * GPS 나 wifi 정보가 켜져있는지 확인합니다.
-     * */
     public boolean isGetLocation() {
         return this.isGetLocation;
     }
 
-    /**
-     * GPS 정보를 가져오지 못했을때
-     * 설정값으로 갈지 물어보는 alert 창
-     * */
     public void showSettingsAlert(){
         AlertDialog.Builder alertDialog = new AlertDialog.Builder(mContext);
 
         alertDialog.setTitle("GPS 사용유무셋팅");
         alertDialog.setMessage("GPS 셋팅이 되지 않았을수도 있습니다. \n 설정창으로 가시겠습니까?");
 
-        // OK 를 누르게 되면 설정창으로 이동합니다.
         alertDialog.setPositiveButton("Settings",
                 new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog,int which) {
@@ -319,7 +450,6 @@ class GpsInfo extends Service implements LocationListener {
                         mContext.startActivity(intent);
                     }
                 });
-        // Cancle 하면 종료 합니다.
         alertDialog.setNegativeButton("Cancel",
                 new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int which) {
